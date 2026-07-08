@@ -7,6 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.models.audit_log import AuditLog
 from app.models.sample import Sample
 from app.models.user import User
 from app.schemas.sample import (
@@ -15,6 +16,7 @@ from app.schemas.sample import (
     SampleOut,
     SamplePriority,
     SampleStatus,
+    SampleUpdate,
 )
 
 
@@ -22,6 +24,29 @@ router = APIRouter(
     prefix="/samples",
     tags=["Samples"],
 )
+
+
+def get_active_user_or_error(
+    db: Session,
+    user_id: int,
+    field_name: str,
+) -> User:
+    user = db.get(User, user_id)
+
+    if user is None or not user.is_active:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail=f"{field_name} does not match an active user.",
+        )
+
+    return user
+
+
+def value_to_audit_string(value: object) -> str | None:
+    if value is None:
+        return None
+
+    return str(value)
 
 
 @router.post(
@@ -33,22 +58,18 @@ def create_sample(
     payload: SampleCreate,
     db: Session = Depends(get_db),
 ):
-    creator = db.get(User, payload.created_by_id)
-
-    if creator is None:
-        raise HTTPException(
-            status_code=http_status.HTTP_400_BAD_REQUEST,
-            detail="created_by_id does not match an existing user.",
-        )
+    get_active_user_or_error(
+        db=db,
+        user_id=payload.created_by_id,
+        field_name="created_by_id",
+    )
 
     if payload.assigned_to_id is not None:
-        assigned_user = db.get(User, payload.assigned_to_id)
-
-        if assigned_user is None:
-            raise HTTPException(
-                status_code=http_status.HTTP_400_BAD_REQUEST,
-                detail="assigned_to_id does not match an existing user.",
-            )
+        get_active_user_or_error(
+            db=db,
+            user_id=payload.assigned_to_id,
+            field_name="assigned_to_id",
+        )
 
     sample = Sample(**payload.model_dump())
 
@@ -108,7 +129,11 @@ def list_samples(
     if end_date is not None:
         conditions.append(Sample.received_date <= end_date)
 
-    total = db.scalar(select(func.count()).select_from(Sample).where(*conditions))
+    total = db.scalar(
+        select(func.count())
+        .select_from(Sample)
+        .where(*conditions)
+    )
 
     sort_columns = {
         "sample_id": Sample.sample_id,
@@ -155,5 +180,123 @@ def get_sample(
             status_code=http_status.HTTP_404_NOT_FOUND,
             detail="Sample not found.",
         )
+
+    return sample
+
+
+@router.patch(
+    "/{sample_db_id}",
+    response_model=SampleOut,
+)
+def update_sample(
+    sample_db_id: int,
+    payload: SampleUpdate,
+    db: Session = Depends(get_db),
+):
+    sample = db.get(Sample, sample_db_id)
+
+    if sample is None or sample.is_deleted:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail="Sample not found.",
+        )
+
+    get_active_user_or_error(
+        db=db,
+        user_id=payload.changed_by_id,
+        field_name="changed_by_id",
+    )
+
+    update_data = payload.model_dump(exclude_unset=True)
+    changed_by_id = update_data.pop("changed_by_id")
+
+    if not update_data:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail="At least one sample field must be provided.",
+        )
+
+    if "assigned_to_id" in update_data and update_data["assigned_to_id"] is not None:
+        get_active_user_or_error(
+            db=db,
+            user_id=update_data["assigned_to_id"],
+            field_name="assigned_to_id",
+        )
+
+    audit_logs: list[AuditLog] = []
+
+    for field_name, new_value in update_data.items():
+        old_value = getattr(sample, field_name)
+
+        if old_value == new_value:
+            continue
+
+        setattr(sample, field_name, new_value)
+
+        audit_logs.append(
+            AuditLog(
+                sample_db_id=sample.id,
+                changed_by_id=changed_by_id,
+                action="update",
+                field_name=field_name,
+                old_value=value_to_audit_string(old_value),
+                new_value=value_to_audit_string(new_value),
+            )
+        )
+
+    if not audit_logs:
+        return sample
+
+    db.add_all(audit_logs)
+    db.commit()
+    db.refresh(sample)
+
+    return sample
+
+
+@router.delete(
+    "/{sample_db_id}",
+    response_model=SampleOut,
+)
+def soft_delete_sample(
+    sample_db_id: int,
+    deleted_by_id: int = Query(gt=0),
+    db: Session = Depends(get_db),
+):
+    sample = db.get(Sample, sample_db_id)
+
+    if sample is None or sample.is_deleted:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail="Sample not found.",
+        )
+
+    deleted_by = get_active_user_or_error(
+        db=db,
+        user_id=deleted_by_id,
+        field_name="deleted_by_id",
+    )
+
+    if deleted_by.role != "admin":
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="Only admin users can delete samples.",
+        )
+
+    sample.is_deleted = True
+
+    db.add(
+        AuditLog(
+            sample_db_id=sample.id,
+            changed_by_id=deleted_by_id,
+            action="soft_delete",
+            field_name="is_deleted",
+            old_value="False",
+            new_value="True",
+        )
+    )
+
+    db.commit()
+    db.refresh(sample)
 
     return sample

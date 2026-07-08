@@ -48,6 +48,32 @@ class SampleCreate(SampleBase):
     created_by_id: int = Field(gt=0)
 
 
+class SampleUpdate(BaseModel):
+    changed_by_id: int = Field(gt=0)
+
+    test_type: str | None = Field(
+        default=None,
+        min_length=2,
+        max_length=80,
+        examples=["Respiratory Panel"],
+    )
+    received_date: datetime | None = None
+    status: SampleStatus | None = None
+    priority: SamplePriority | None = None
+    assigned_to_id: int | None = None
+
+    @field_validator("test_type")
+    @classmethod
+    def strip_optional_text_fields(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("Field cannot be blank.")
+        return cleaned
+
+
 class SampleOut(BaseModel):
     id: int
     sample_id: str

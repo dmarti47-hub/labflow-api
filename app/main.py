@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 
 from app.database import check_database_connection
+from app.routers.audit_logs import router as audit_logs_router
 from app.routers.samples import router as samples_router
 from app.settings import settings
 
@@ -13,6 +14,7 @@ app = FastAPI(
 
 
 app.include_router(samples_router)
+app.include_router(audit_logs_router)
 
 
 @app.get("/")
