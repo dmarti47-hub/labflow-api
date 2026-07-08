@@ -1,0 +1,65 @@
+from __future__ import annotations
+
+from datetime import datetime
+
+from sqlalchemy import DateTime, ForeignKey, Index, String, Text, func
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.database import Base
+
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    __table_args__ = (
+        Index("ix_audit_logs_sample_created", "sample_db_id", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+
+    sample_db_id: Mapped[int] = mapped_column(
+        ForeignKey("samples.id"),
+        nullable=False,
+        index=True,
+    )
+
+    changed_by_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id"),
+        nullable=False,
+    )
+
+    action: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+    )
+
+    field_name: Mapped[str | None] = mapped_column(
+        String(80),
+        nullable=True,
+    )
+
+    old_value: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+
+    new_value: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+    sample = relationship(
+        "Sample",
+        back_populates="audit_logs",
+    )
+
+    changed_by = relationship(
+        "User",
+        back_populates="audit_logs",
+    )
