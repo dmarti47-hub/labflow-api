@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 
 from app.database import check_database_connection
+from app.routers.samples import router as samples_router
 from app.settings import settings
 
 
@@ -9,6 +10,9 @@ app = FastAPI(
     version="0.1.0",
     description="Production-style REST API for tracking mock clinical lab sample workflows.",
 )
+
+
+app.include_router(samples_router)
 
 
 @app.get("/")
