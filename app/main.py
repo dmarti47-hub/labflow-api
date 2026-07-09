@@ -7,6 +7,7 @@ from app.routers.qc_notes import router as qc_notes_router
 from app.routers.reports import router as reports_router
 from app.routers.samples import router as samples_router
 from app.settings import settings
+from app.routers.users import router as users_router
 
 
 app = FastAPI(
@@ -21,6 +22,7 @@ app.include_router(samples_router)
 app.include_router(qc_notes_router)
 app.include_router(audit_logs_router)
 app.include_router(reports_router)
+app.include_router(users_router)
 
 
 @app.get("/")
