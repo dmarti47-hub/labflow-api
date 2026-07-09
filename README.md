@@ -44,6 +44,7 @@ The goal was to build more than basic CRUD endpoints. LabFlow API includes persi
 * QC notes for sample review workflows
 * Audit logging for workflow changes
 * Operational reporting endpoints
+* CSV export for operational reports
 * PostgreSQL persistence
 * Alembic database migrations
 * Dockerized local setup
@@ -110,8 +111,11 @@ GET /audit-log/{sample_id}
 
 ```text
 GET /reports/status-summary
+GET /reports/status-summary/export
 GET /reports/test-type-summary
+GET /reports/test-type-summary/export
 GET /reports/overdue
+GET /reports/overdue/export
 ```
 
 ---
