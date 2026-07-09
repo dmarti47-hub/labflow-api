@@ -1,5 +1,7 @@
 # LabFlow API
 
+[![CI](https://github.com/dmarti47-hub/labflow-api/actions/workflows/ci.yml/badge.svg)](https://github.com/YOUR_USERNAME/labflow-api/actions/workflows/ci.yml)
+
 Production-style REST API for tracking mock clinical lab sample workflows.
 
 LabFlow API is a backend portfolio project built with FastAPI, PostgreSQL, SQLAlchemy, Alembic, Docker, JWT authentication, role-based access control, audit logging, QC notes, reporting endpoints, automated tests, Ruff linting, and GitHub Actions CI.
