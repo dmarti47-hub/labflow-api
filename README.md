@@ -116,6 +116,38 @@ GET /reports/overdue
 
 ---
 
+## Screenshots
+
+### API Documentation
+
+![API Documentation](docs/screenshots/api-docs.png)
+
+### Auth Login
+
+![Auth Login](docs/screenshots/auth-login.png)
+
+### Create Sample
+
+![Create Sample](docs/screenshots/create-sample.png)
+
+### Sample Listing
+
+![Sample Listing](docs/screenshots/list-samples.png)
+
+### QC Notes
+
+![QC Notes](docs/screenshots/qc-notes.png)
+
+### Reports
+
+![Reports](docs/screenshots/reports.png)
+
+### GitHub Actions CI
+
+![GitHub Actions CI](docs/screenshots/github-actions.png)
+
+---
+
 ## Local Setup
 
 Clone the repository:
