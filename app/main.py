@@ -2,6 +2,7 @@ from fastapi import FastAPI
 
 from app.database import check_database_connection
 from app.routers.audit_logs import router as audit_logs_router
+from app.routers.auth import router as auth_router
 from app.routers.qc_notes import router as qc_notes_router
 from app.routers.reports import router as reports_router
 from app.routers.samples import router as samples_router
@@ -15,6 +16,7 @@ app = FastAPI(
 )
 
 
+app.include_router(auth_router)
 app.include_router(samples_router)
 app.include_router(qc_notes_router)
 app.include_router(audit_logs_router)
