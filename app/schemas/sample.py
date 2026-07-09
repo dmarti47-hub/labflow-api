@@ -45,12 +45,10 @@ class SampleBase(BaseModel):
 
 
 class SampleCreate(SampleBase):
-    created_by_id: int = Field(gt=0)
+    pass
 
 
 class SampleUpdate(BaseModel):
-    changed_by_id: int = Field(gt=0)
-
     test_type: str | None = Field(
         default=None,
         min_length=2,

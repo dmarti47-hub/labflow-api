@@ -2,8 +2,10 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import and_, func, or_, select, text
 from sqlalchemy.orm import Session
 
+from app.auth.dependencies import get_current_user
 from app.database import get_db
 from app.models.sample import Sample
+from app.models.user import User
 from app.schemas.report import (
     OverdueSamplesReport,
     StatusSummaryReport,
@@ -23,7 +25,10 @@ router = APIRouter(
 )
 def get_status_summary(
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
+    _ = current_user
+
     rows = db.execute(
         select(
             Sample.status,
@@ -54,7 +59,10 @@ def get_status_summary(
 )
 def get_test_type_summary(
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
+    _ = current_user
+
     rows = db.execute(
         select(
             Sample.test_type,
@@ -85,7 +93,10 @@ def get_test_type_summary(
 )
 def get_overdue_samples(
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
+    _ = current_user
+
     overdue_conditions = or_(
         and_(
             Sample.priority == "urgent",

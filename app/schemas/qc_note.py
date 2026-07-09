@@ -20,7 +20,6 @@ class QCNoteCreate(BaseModel):
         examples=["Control failed. Repeat testing required."],
     )
     note_type: QCNoteType = "general"
-    created_by_id: int = Field(gt=0)
 
     @field_validator("note")
     @classmethod

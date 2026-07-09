@@ -6,6 +6,7 @@ from sqlalchemy import asc, desc, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.auth.dependencies import get_current_user, require_admin
 from app.database import get_db
 from app.models.audit_log import AuditLog
 from app.models.sample import Sample
@@ -57,13 +58,8 @@ def value_to_audit_string(value: object) -> str | None:
 def create_sample(
     payload: SampleCreate,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    get_active_user_or_error(
-        db=db,
-        user_id=payload.created_by_id,
-        field_name="created_by_id",
-    )
-
     if payload.assigned_to_id is not None:
         get_active_user_or_error(
             db=db,
@@ -71,7 +67,10 @@ def create_sample(
             field_name="assigned_to_id",
         )
 
-    sample = Sample(**payload.model_dump())
+    sample = Sample(
+        **payload.model_dump(),
+        created_by_id=current_user.id,
+    )
 
     db.add(sample)
 
@@ -95,6 +94,7 @@ def create_sample(
 )
 def list_samples(
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=25, ge=1, le=100),
     status: SampleStatus | None = Query(default=None),
@@ -112,6 +112,8 @@ def list_samples(
     ] = "received_date",
     sort_order: Literal["asc", "desc"] = "desc",
 ):
+    _ = current_user
+
     conditions = [Sample.is_deleted.is_(False)]
 
     if status is not None:
@@ -172,7 +174,10 @@ def list_samples(
 def get_sample(
     sample_db_id: int,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
+    _ = current_user
+
     sample = db.get(Sample, sample_db_id)
 
     if sample is None or sample.is_deleted:
@@ -192,6 +197,7 @@ def update_sample(
     sample_db_id: int,
     payload: SampleUpdate,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     sample = db.get(Sample, sample_db_id)
 
@@ -201,14 +207,7 @@ def update_sample(
             detail="Sample not found.",
         )
 
-    get_active_user_or_error(
-        db=db,
-        user_id=payload.changed_by_id,
-        field_name="changed_by_id",
-    )
-
     update_data = payload.model_dump(exclude_unset=True)
-    changed_by_id = update_data.pop("changed_by_id")
 
     if not update_data:
         raise HTTPException(
@@ -236,7 +235,7 @@ def update_sample(
         audit_logs.append(
             AuditLog(
                 sample_db_id=sample.id,
-                changed_by_id=changed_by_id,
+                changed_by_id=current_user.id,
                 action="update",
                 field_name=field_name,
                 old_value=value_to_audit_string(old_value),
@@ -260,8 +259,8 @@ def update_sample(
 )
 def soft_delete_sample(
     sample_db_id: int,
-    deleted_by_id: int = Query(gt=0),
     db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
 ):
     sample = db.get(Sample, sample_db_id)
 
@@ -271,24 +270,12 @@ def soft_delete_sample(
             detail="Sample not found.",
         )
 
-    deleted_by = get_active_user_or_error(
-        db=db,
-        user_id=deleted_by_id,
-        field_name="deleted_by_id",
-    )
-
-    if deleted_by.role != "admin":
-        raise HTTPException(
-            status_code=http_status.HTTP_403_FORBIDDEN,
-            detail="Only admin users can delete samples.",
-        )
-
     sample.is_deleted = True
 
     db.add(
         AuditLog(
             sample_db_id=sample.id,
-            changed_by_id=deleted_by_id,
+            changed_by_id=current_user.id,
             action="soft_delete",
             field_name="is_deleted",
             old_value="False",
